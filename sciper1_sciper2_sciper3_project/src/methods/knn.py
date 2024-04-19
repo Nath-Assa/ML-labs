@@ -26,14 +26,16 @@ class KNN(object):
             Returns:
                 pred_labels (np.array): labels of shape (N,)
         """
+        if training_labels.dtype == int:
+            self.task_kind = "classification"
+        else :
+            self.task_kind = "regression"
 
-        ##
-        ###
-        #### YOUR CODE HERE!
-        ###
-        ##
-        return pred_labels
-
+        self.training_data = training_data
+        self.training_labels = training_labels
+        pred_labels = self.predict(self.training_data)
+        return pred_labels  
+        
     def predict(self, test_data):
         """
             Runs prediction on the test data.
@@ -43,9 +45,34 @@ class KNN(object):
             Returns:
                 test_labels (np.array): labels of shape (N,)
         """
-        ##
-        ###
-        #### YOUR CODE HERE!
-        ###
-        ##
+        k = 10
+        N = len(test_data)
+        test_labels =np.zeros(N)
+
+        for i in range(N): 
+            distances = self.compute_distances(test_data[i]) # Distance between sample i of test data, and all samples of the training set
+            idxs = self.k_nearest_neighbors(k,distances) # Indexes of the k nearest neighbors 
+            if self.task_kind == "classification" : 
+                n_labels = self.training_labels[idxs] # Labels of the k nearest neighbors 
+                test_labels[i] =self.predict_label(n_labels) # Predict the label of test sample i 
+            else : 
+                n_distances = distances[idxs] # Distances of the k nearest neighbors 
+                n_ys = self.training_data[idxs] # Labels of the k nearest neighbors 
+                if ( n_distances[0] == 0 ): 
+                    test_labels[i] = n_ys[0]
+                else :
+                    test_labels[i] = (1/k)*np.sum((1/n_distances)*n_ys, axis=0)  
         return test_labels
+        
+     def compute_distances(self,exemple): # Compute the Euclidean distance between a single example vector, and all training samples 
+        values = np.square(self.training_data - exemple)
+        distances = np.sqrt(np.sum(values,axis=1))
+        return distances
+
+    def k_nearest_neighbors(self,k,distances): # Find the k nearest neighbors
+        indices = np.argsort(distances)
+        return indices[:k] # Return the indices of the k nearest neighbors
+
+    def predict_label(self,neighbors_labels): # Assign to the example vector, the most common label over its k nearest neighbors 
+        nb_occurences = np.bincount(neighbors_labels)
+        return np.argmax(nb_occurences)
