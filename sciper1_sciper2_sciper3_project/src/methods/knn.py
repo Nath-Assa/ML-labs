@@ -1,10 +1,10 @@
 import numpy as np
 
-class KNN(object):
+class KNN:
     """
-        kNN classifier object.
+    k-Nearest Neighbors classifier object.
     """
-
+    
     def __init__(self, k=1, task_kind = "classification"):
         """
             Call set_arguments function of this class.
@@ -26,17 +26,15 @@ class KNN(object):
             Returns:
                 pred_labels (np.array): labels of shape (N,)
         """
-        if training_labels.dtype == int:
-            self.task_kind = "classification"
-        else :
-            self.task_kind = "regression"
 
         self.training_data = training_data
         self.training_labels = training_labels
         pred_labels = self.predict(self.training_data)
         return pred_labels  
         
+
     def predict(self, test_data):
+
         """
             Runs prediction on the test data.
 
@@ -47,25 +45,29 @@ class KNN(object):
         """
         k = 10
         N = len(test_data)
-        test_labels =np.zeros(N)
-
-        for i in range(N): 
-            distances = self.compute_distances(test_data[i]) # Distance between sample i of test data, and all samples of the training set
-            idxs = self.k_nearest_neighbors(k,distances) # Indexes of the k nearest neighbors 
-            if self.task_kind == "classification" : 
-                n_labels = self.training_labels[idxs] # Labels of the k nearest neighbors 
-                test_labels[i] =self.predict_label(n_labels) # Predict the label of test sample i 
-            else : 
+        test_labels = np.zeros(N)
+        if(self.task_kind == "classification") :
+            test_labels = self.knn(test_data,k)
+        else :
+            for i, example in enumerate(test_data) :
+                distances = self.compute_distances(test_data[i])
+                idxs = self.k_nearest_neighbors(k,distances)
                 n_distances = distances[idxs] # Distances of the k nearest neighbors 
-                n_ys = self.training_data[idxs] # Labels of the k nearest neighbors 
-                if ( n_distances[0] == 0 ): 
-                    test_labels[i] = n_ys[0]
+                n_ys = self.training_labels[idxs] # Labels of the k nearest neighbors 
+                if n_distances[0] == 0 : 
+                    test_labels[i] = np.mean(n_ys)
                 else :
-                    test_labels[i] = (1/k)*np.sum((1/n_distances)*n_ys, axis=0)  
+                    weights = 1 / n_distances
+                    reshape_w = weights[:,np.newaxis]
+                    values = reshape_w*n_ys
+                    sum = np.sum(values)
+                    test_labels[i] = np.sum(weights[:, np.newaxis] * n_ys, axis=0) / np.sum(weights)
+
         return test_labels
-        
-    def compute_distances(self,exemple): # Compute the Euclidean distance between a single example vector, and all training samples 
-        values = np.square(self.training_data - exemple)
+
+
+    def compute_distances(self,training_data,exemple): # Compute the Euclidean distance between a single example vector, and all training samples 
+        values = np.square(training_data - exemple)
         distances = np.sqrt(np.sum(values,axis=1))
         return distances
 
@@ -76,3 +78,14 @@ class KNN(object):
     def predict_label(self,neighbors_labels): # Assign to the example vector, the most common label over its k nearest neighbors 
         nb_occurences = np.bincount(neighbors_labels)
         return np.argmax(nb_occurences)
+    
+    def knn_single_sample(self,single_sample,training_data,training_labels,k) :
+        distances = self.compute_distances(training_data,single_sample)
+        idxs = self.k_nearest_neighbors(k,distances)
+        n_labels = training_labels[idxs]
+        single_sample_prediction = self.predict_label(n_labels)
+        return single_sample_prediction
+        
+    def knn(self,samples,k) :
+        return np.apply_along_axis(self.knn_single_sample, axis= 1, arr=samples,training_data = self.training_data,
+        training_labels = self.training_labels,k=k)
