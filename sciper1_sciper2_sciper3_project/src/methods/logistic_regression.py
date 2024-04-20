@@ -18,7 +18,9 @@ class LogisticRegression(object):
         self.weights = None
 
     def softmax(self, data, w):
-        exponential = np.exp(data @ w)
+        z = data @ w
+        z_max = np.max(z, axis=1, keepdims=True)
+        exponential = np.exp(z-z_max)
         res = exponential / np.sum(exponential, axis=1, keepdims=True)
         return res
 
