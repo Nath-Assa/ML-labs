@@ -1,55 +1,55 @@
 import numpy as np
-
-from ..utils import get_n_classes, label_to_onehot, onehot_to_label
-
+from ..utils import label_to_onehot, append_bias_term
 
 class LogisticRegression(object):
     """
-    Logistic regression classifier.
+    Logistic regression classifier using softmax and cross-entropy loss for multiclass classification.
     """
 
     def __init__(self, lr, max_iters=500):
         """
-        Initialize the new object (see dummy_methods.py)
-        and set its arguments.
-
+        Initialize the logistic regression model.
         Arguments:
-            lr (float): learning rate of the gradient descent
-            max_iters (int): maximum number of iterations
+            lr (float): Learning rate of the gradient descent
+            max_iters (int): Maximum number of iterations
         """
         self.lr = lr
         self.max_iters = max_iters
+        self.weights = None
 
+    def softmax(self, data, w):
+        exponential = np.exp(data @ w)
+        res = exponential / np.sum(exponential, axis=1, keepdims=True)
+        return res
+
+    
 
     def fit(self, training_data, training_labels):
         """
-        Trains the model, returns predicted labels for training data.
-
+        Fit the logistic regression model using gradient descent.
         Arguments:
-            training_data (array): training data of shape (N,D)
-            training_labels (array): regression target of shape (N,)
-        Returns:
-            pred_labels (array): target of shape (N,)
+            training_data (array): Training data of shape (N, D)
+            training_labels (array): True labels of shape (N,)
         """
-        ##
-        ###
-        #### WRITE YOUR CODE HERE!
-        ###
-        ##
-        return pred_labels
+        one_hot_labels = label_to_onehot(training_labels)
+        n_features = training_data.shape[1]
+        n_classes = one_hot_labels.shape[1]
+        self.weights = np.zeros(shape=(n_features, n_classes))
+
+        for i in range(self.max_iters):
+            predictions = self.softmax(training_data, self.weights)
+            gradient = training_data.T @ (predictions - one_hot_labels)
+            self.weights -= self.lr*gradient
+        return self.predict(training_data)
+            
 
     def predict(self, test_data):
         """
-        Runs prediction on the test data.
-
+        Predict using the logistic regression model.
         Arguments:
-            test_data (array): test data of shape (N,D)
+            test_data (array): Test data of shape (N, D)
         Returns:
-            pred_labels (array): labels of shape (N,)
+            pred_labels (array): Predicted labels of shape (N,)
         """
-        ##
-        ###
-        #### WRITE YOUR CODE HERE!
-        ###
-        ##
-        return pred_labels
+        prediction = self.softmax(test_data, self.weights)
+        return np.argmax(prediction, axis=1)

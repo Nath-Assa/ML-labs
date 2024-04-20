@@ -1,6 +1,8 @@
 import argparse
+import time
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from src.data import load_data
 from src.methods.dummy_methods import DummyClassifier
@@ -48,6 +50,16 @@ def main(args):
         pass
     
     ### WRITE YOUR CODE HERE to do any other data processing
+    means_train = np.mean(xtrain, axis=0)
+    stds_train = np.std(xtrain , axis=0)  
+    mean_test = np.mean(xtest, axis=0)
+    std_test = np.std(xtest, axis=0)
+    xtrain= normalize_fn(xtrain,means_train,stds_train)
+    xtest = normalize_fn(xtest,mean_test,std_test)
+    if args.bias :    
+        xtrain = append_bias_term(xtrain)
+        xtest = append_bias_term(xtest)
+    
 
     
 
@@ -61,8 +73,18 @@ def main(args):
     if args.method == "dummy_classifier":
         method_obj = DummyClassifier(arg1=1, arg2=2)
 
-    elif ...:  ### WRITE YOUR CODE HERE
-        pass
+    elif args.method == "knn":
+        if args.task == "breed_identifying":
+            method_obj = KNN(k=args.K, task_kind="classification")
+        elif args.task == "center_locating":
+            method_obj = KNN(k=args.K, task_kind="regression")    
+
+    elif args.method == "linear_regression":
+        method_obj = LinearRegression(lmda=args.lmda)
+
+    elif args.method == "logistic_regression":
+        method_obj = LogisticRegression(lr=args.lr, max_iters=args.max_iters)
+        
 
 
     ## 4. Train and evaluate the method
@@ -78,13 +100,17 @@ def main(args):
         ## Report results: performance on train and valid/test sets
         train_loss = mse_fn(train_pred, ctrain)
         loss = mse_fn(preds, ctest)
+        if args.method == "linear_regression":
+            print(f"\nlmda = {args.lmda:.2f}")
 
-        print(f"\nTrain loss = {train_loss:.3f}% - Test loss = {loss:.3f}")
+        print(f"\nTrain loss = {train_loss:.6f} - Test loss = {loss:.6f}")
 
     elif args.task == "breed_identifying":
 
         # Fit (:=train) the method on the training data for classification task
+        s1 = time.time() 
         preds_train = method_obj.fit(xtrain, ytrain)
+        s2 = time.time()
 
         # Predict on unseen data
         preds = method_obj.predict(xtest)
@@ -92,6 +118,8 @@ def main(args):
         ## Report results: performance on train and valid/test sets
         acc = accuracy_fn(preds_train, ytrain)
         macrof1 = macrof1_fn(preds_train, ytrain)
+        if args.method == "logistic_regression":
+            print(f"\nlr = {args.lr:.4f} ")
         print(f"\nTrain set: accuracy = {acc:.3f}% - F1-score = {macrof1:.6f}")
 
         acc = accuracy_fn(preds, ytest)
@@ -101,6 +129,14 @@ def main(args):
         raise Exception("Invalid choice of task! Only support center_locating and breed_identifying!")
 
     ### WRITE YOUR CODE HERE if you want to add other outputs, visualization, etc.
+    if args.task == 'breed_identifying':
+        args.acc = acc
+    elif args.task == 'center_locating':
+        args.loss = loss
+
+    if args.task == 'breed_identifying':
+
+        print("Fit time :", s2-s1, "seconds")    
 
 
 if __name__ == '__main__':
@@ -119,6 +155,7 @@ if __name__ == '__main__':
 
 
     # Feel free to add more arguments here if you need!
+    parser.add_argument('--bias', action="store_true", help="add bias term to the data")
 
     # MS2 arguments
     parser.add_argument('--nn_type', default="cnn", help="which network to use, can be 'Transformer' or 'cnn'")
