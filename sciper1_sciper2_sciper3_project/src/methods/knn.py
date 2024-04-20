@@ -43,15 +43,14 @@ class KNN:
             Returns:
                 test_labels (np.array): labels of shape (N,)
         """
-        k = 10
         N = len(test_data)
         test_labels = np.zeros(N)
         if(self.task_kind == "classification") :
-            test_labels = self.knn(test_data,k)
+            test_labels = self.knn(test_data,self.k)
         else :
             for i, example in enumerate(test_data) :
                 distances = self.compute_distances(test_data[i])
-                idxs = self.k_nearest_neighbors(k,distances)
+                idxs = self.k_nearest_neighbors(self.k,distances)
                 n_distances = distances[idxs] # Distances of the k nearest neighbors 
                 n_ys = self.training_labels[idxs] # Labels of the k nearest neighbors 
                 if n_distances[0] == 0 : 
