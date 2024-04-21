@@ -6,7 +6,7 @@ class LogisticRegression(object):
     Logistic regression classifier using softmax and cross-entropy loss for multiclass classification.
     """
 
-    def __init__(self, lr, max_iters=500):
+    def __init__(self, lr, max_iters=500, task_kind = "classification"):
         """
         Initialize the logistic regression model.
         Arguments:
@@ -16,6 +16,7 @@ class LogisticRegression(object):
         self.lr = lr
         self.max_iters = max_iters
         self.weights = None
+        self.task_kind = task_kind
 
     def softmax(self, data, w):
         z = data @ w
