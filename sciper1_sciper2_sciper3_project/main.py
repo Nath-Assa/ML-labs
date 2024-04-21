@@ -129,14 +129,14 @@ def main(args):
         raise Exception("Invalid choice of task! Only support center_locating and breed_identifying!")
 
     ### WRITE YOUR CODE HERE if you want to add other outputs, visualization, etc.
-    if args.task == 'breed_identifying':
-        args.acc = acc
-    elif args.task == 'center_locating':
+    if args.task == 'center_locating':
         args.loss = loss
-
-    if args.task == 'breed_identifying':
-
+    elif args.task == 'breed_identifying':
+        args.acc = acc
         print("Fit time :", s2-s1, "seconds")    
+
+
+    
 
 
 if __name__ == '__main__':
