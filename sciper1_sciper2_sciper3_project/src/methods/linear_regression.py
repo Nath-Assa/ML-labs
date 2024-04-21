@@ -8,12 +8,13 @@ class LinearRegression(object):
         Recall that linear regression is just ridge regression with lambda=0.
     """
 
-    def __init__(self, lmda):
+    def __init__(self, lmda,  task_kind ="regression"):
         """
             Initialize the Linear Regression model with a lambda parameter for ridge regression.
         """
         self.lmda = lmda
         self.theta = None  # This will store the model coefficients after fitting
+        self.task_kind = task_kind
 
     def fit(self, training_data, training_labels):
         """
@@ -24,10 +25,15 @@ class LinearRegression(object):
             Returns:
                 pred_labels (np.array): Predicted labels of shape (N, regression_target_size)
         """
+        D = training_data.shape[1]
+
         # Regularization matrix setup
-        L = self.lmda * np.eye(training_data.shape[1])
-        if self.lmda != 0:
-            L[0, 0] = 0  # Assume first column is the bias term, do not regularize it if lambda is not zero
+        L = self.lmda * np.eye(D)
+
+        # Check if the first column is all ones (common heuristic to detect bias term)
+        if np.all(training_data[:, 0] == 1):
+            # Assume first column is the bias term, do not regularize it
+            L[0, 0] = 0
 
         # Solve the normal equation with regularization
         self.theta = np.linalg.inv(training_data.T @ training_data + L) @ training_data.T @ training_labels
@@ -35,7 +41,7 @@ class LinearRegression(object):
         # Predict on the training data using the calculated coefficients
         pred_labels = training_data @ self.theta
         return pred_labels
-
+    
     def predict(self, test_data):
         """
             Predicts output using the linear model coefficients.
