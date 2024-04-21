@@ -67,8 +67,8 @@ class KNN:
         return test_labels
 
 
-    def compute_distances(self,exemple): # Compute the Euclidean distance between a single example vector, and all training samples 
-        values = np.square(self.training_data - exemple)
+    def compute_distances(self,example): # Compute the Euclidean distance between a single example vector, and all training samples 
+        values = np.square(self.training_data - example)
         distances = np.sqrt(np.sum(values,axis=1))
         return distances # Return the distances to all training samples
 
