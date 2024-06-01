@@ -8,6 +8,13 @@ from src.methods.pca import PCA
 from src.methods.deep_network import MLP, CNN, Trainer, MyViT
 from src.utils import normalize_fn, append_bias_term, accuracy_fn, macrof1_fn, get_n_classes
 
+def train_val_split(x, y, val_size=0.2, random_seed=42):
+    np.random.seed(random_seed)
+    indices = np.arange(x.shape[0])
+    np.random.shuffle(indices)
+    val_split_idx = int(x.shape[0] * val_size)
+    train_indices, val_indices = indices[val_split_idx:], indices[:val_split_idx]
+    return x[train_indices], x[val_indices], y[train_indices], y[val_indices]
 
 def main(args):
     """
@@ -19,17 +26,23 @@ def main(args):
                           of this file). Their value can be accessed as "args.argument".
     """
     ## 1. First, we load our data and flatten the images into vectors
-    xtrain, xtest, ytrain = load_data(args.data_path)
+    xtrain, xtest, ytrain = load_data(args.data)
     xtrain = xtrain.reshape(xtrain.shape[0], -1)
     xtest = xtest.reshape(xtest.shape[0], -1)
 
     ## 2. Then we must prepare it. This is were you can create a validation set,
     #  normalize, add bias, etc.
+    means = np.mean(xtrain, axis=0)
+    stds = np.std(xtrain, axis=0)
+    
+    xtrain = normalize_fn(xtrain, means, stds)
+    xtest = normalize_fn(xtest, means, stds)
 
     # Make a validation set
     if not args.test:
-    ### WRITE YOUR CODE HERE
-        print("Using PCA")
+        xtrain, xval, ytrain, yval = train_val_split(xtrain, ytrain, val_size=0.2)
+    else:
+        xval, yval = None, None  # No validation set if evaluating on test data
 
     ### WRITE YOUR CODE HERE to do any other data processing
 
@@ -39,6 +52,11 @@ def main(args):
         print("Using PCA")
         pca_obj = PCA(d=args.pca_d)
         ### WRITE YOUR CODE HERE: use the PCA object to reduce the dimensionality of the data
+        pca_obj.find_principal_components(xtrain)
+        xtrain = pca_obj.reduce_dimension(xtrain)
+        if not args.test:
+            xval = pca_obj.reduce_dimension(xval)
+        xtest = pca_obj.reduce_dimension(xtest)
 
 
     ## 3. Initialize the method you want to use.
@@ -49,34 +67,42 @@ def main(args):
     # Note: you might need to reshape the data depending on the network you use!
     n_classes = get_n_classes(ytrain)
     if args.nn_type == "mlp":
-        model = ... ### WRITE YOUR CODE HERE
+       model = MLP(input_size=xtrain.shape[1], n_classes=n_classes)
+    elif args.nn_type == "cnn":
+        model = CNN(input_channels=1, n_classes=n_classes)
+    elif args.nn_type == "transformer":
+        model =  MyViT(chw=(1, 28, 28), n_patches=7, n_blocks=6, hidden_d=64, n_heads=8, out_d=n_classes)
+    else:
+        raise ValueError("Invalid nn_type")
 
     summary(model)
 
     # Trainer object
-    method_obj = Trainer(model, lr=args.lr, epochs=args.max_iters, batch_size=args.nn_batch_size)
+    method_obj = Trainer(model, lr=args.lr, epochs=args.max_iters, batch_size=args.nn_batch_size, device=args.device)
 
 
     ## 4. Train and evaluate the method
 
     # Fit (:=train) the method on the training data
     preds_train = method_obj.fit(xtrain, ytrain)
-
-    # Predict on unseen data
-    preds = method_obj.predict(xtest)
-
+    
     ## Report results: performance on train and valid/test sets
     acc = accuracy_fn(preds_train, ytrain)
     macrof1 = macrof1_fn(preds_train, ytrain)
     print(f"\nTrain set: accuracy = {acc:.3f}% - F1-score = {macrof1:.6f}")
-
-
-    ## As there are no test dataset labels, check your model accuracy on validation dataset.
-    # You can check your model performance on test set by submitting your test set predictions on the AIcrowd competition.
-    acc = accuracy_fn(preds, xtest)
-    macrof1 = macrof1_fn(preds, xtest)
-    print(f"Validation set:  accuracy = {acc:.3f}% - F1-score = {macrof1:.6f}")
-
+    
+    # Predict on unseen data
+    if  args.test:
+        preds = method_obj.predict(xtest)
+        np.savetxt("test_predictions.csv", preds, delimiter=",")
+        print("Test set predictions saved to 'test_predictions.csv'. Submit this file to AIcrowd for evaluation.")
+    else:
+        preds = method_obj.predict(xval)
+        y_true = yval
+        # Report results: performance on validation set
+        acc_val = accuracy_fn(preds, y_true)
+        macrof1_val = macrof1_fn(preds, y_true)
+        print(f"Validation set: accuracy = {acc_val:.3f}% - F1-score = {macrof1_val:.6f}")
 
     ### WRITE YOUR CODE HERE if you want to add other outputs, visualization, etc.
 
