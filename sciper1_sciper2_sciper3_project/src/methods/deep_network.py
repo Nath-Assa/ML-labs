@@ -68,12 +68,12 @@ class CNN(nn.Module):
             n_classes (int): number of classes to predict
         """
         super().__init__()
-        ##
-        ###
-        #### WRITE YOUR CODE HERE!
-        ###
-        ##
-
+        self.conv1 = nn.Conv2d(input_channels, 16, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(64*4*4, 128)
+        self.fc2 = nn.Linear(128, n_classes)
+        
     def forward(self, x):
         """
         Predict the class of a batch of samples with the model.
@@ -84,11 +84,12 @@ class CNN(nn.Module):
             preds (tensor): logits of predictions of shape (N, C)
                 Reminder: logits are value pre-softmax.
         """
-        ##
-        ###
-        #### WRITE YOUR CODE HERE!
-        ###
-        ##
+        preds = F.max_pool2d(F.relu(self.conv1(preds)), 2)
+        preds = F.max_pool2d(F.relu(self.conv2(preds)), 2)
+        preds = F.max_pool2d(F.relu(self.conv3(preds)), 2)
+        preds = preds.view(-1, 64*4*4)
+        preds = F.relu(self.fc1(preds))
+        preds = self.fc2(preds)
         return preds
         
 class MyMSA(nn.Module) :
