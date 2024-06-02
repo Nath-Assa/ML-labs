@@ -39,16 +39,18 @@ class PCA(object):
             exvar (float): explained variance of the kept dimensions (in percentage, i.e., in [0,100])
         """
         self.mean = np.mean(training_data, axis=0)
-        centered_data = training_data - self.mean
-        cov_matrix = np.cov(centered_data, rowvar=False)
-        eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+        data_centered = training_data - self.mean
+        
+        M_cov = np.cov(data_centered, rowvar=False)
+        eigenvalues, eigenvectors = np.linalg.eigh(M_cov)
+        
         sorted_indices = np.argsort(eigenvalues)[::-1]
-        sorted_eigenvalues = eigenvalues[sorted_indices]
+        sorted_eigenvalues = eigenvalues[ np.argsort(eigenvalues)[::-1]]
         sorted_eigenvectors = eigenvectors[:, sorted_indices]
+        
         self.W = sorted_eigenvectors[:, :self.d]
-        total_variance = np.sum(sorted_eigenvalues)
-        explained_variance = np.sum(sorted_eigenvalues[:self.d])
-        exvar = (explained_variance / total_variance) * 100
+        
+        exvar = (np.sum(sorted_eigenvalues[:self.d]) / np.sum(sorted_eigenvalues)) * 100
         
         return exvar
 
@@ -61,11 +63,7 @@ class PCA(object):
         Returns:
             data_reduced (array): reduced data of shape (N,d)
         """
-        # Subtract the mean to center the data
-        centered_data = data - self.mean
-        
-        # Project the data onto the principal components
-        data_reduced = np.dot(centered_data, self.W)
+        data_centered = data - self.mean
+        data_reduced = data_centered @ self.W
         return data_reduced
         
-
