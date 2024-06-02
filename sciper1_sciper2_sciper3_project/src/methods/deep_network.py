@@ -13,7 +13,7 @@ class MLP(nn.Module):
     It should not use any convolutional layers.
     """
 
-    def __init__(self, input_size, n_classes, hidden_size=128):
+    def __init__(self, input_size, n_classes, hidden_size=128, dropout_rate=0.5, num_layers=3):
         """
         Initialize the network.
         
@@ -24,13 +24,16 @@ class MLP(nn.Module):
             input_size (int): size of the input
             n_classes (int): number of classes to predict
         """
-        super().__init__()
         super(MLP, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, n_classes)
-        self.dropout = nn.Dropout(0.5) 
-
+        self.fc_in = nn.Linear(input_size, hidden_size)
+        
+        self.hidden_layers = nn.ModuleList()
+        for _ in range(num_layers - 2):  # -2 for input and output layers
+            self.hidden_layers.append(nn.Linear(hidden_size, hidden_size))
+        
+        self.fc_out = nn.Linear(hidden_size, n_classes)
+        self.dropout = nn.Dropout(dropout_rate)
+        
     def forward(self, x):
         """
         Predict the class of a batch of samples with the model.
@@ -41,11 +44,14 @@ class MLP(nn.Module):
             preds (tensor): logits of predictions of shape (N, C)
                 Reminder: logits are value pre-softmax.
         """
-        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc_in(x))
         x = self.dropout(x)
-        x = F.relu(self.fc2(x))
-        x = self.dropout(x)
-        preds = self.fc3(x)
+        
+        for layer in self.hidden_layers:
+            x = F.relu(layer(x))
+            x = self.dropout(x)
+        
+        preds = self.fc_out(x)
         return preds
 
 
@@ -56,7 +62,7 @@ class CNN(nn.Module):
     It should use at least one convolutional layer.
     """
 
-    def __init__(self, input_channels, n_classes):
+    def __init__(self, input_channels, n_classes, initial_hidden_channels=16, target_hidden_channels=64, dropout_rate=0.5, num_layers=3):
         """
         Initialize the network.
         
@@ -68,10 +74,32 @@ class CNN(nn.Module):
             n_classes (int): number of classes to predict
         """
         super().__init__()
-        self.conv1 = nn.Conv2d(input_channels, 16, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(64*4*4, 128)
+        super(CNN, self).__init__()
+
+        self.num_layers = num_layers
+
+        self.conv_layers = nn.ModuleList()
+        self.bn_layers = nn.ModuleList()
+
+        step_size = (target_hidden_channels - initial_hidden_channels) // (num_layers - 1)
+
+        # initial convolution layer
+        hidden_channels = initial_hidden_channels
+        self.conv_layers.append(nn.Conv2d(input_channels, hidden_channels, kernel_size=3, stride=1, padding=1))
+        self.bn_layers.append(nn.BatchNorm2d(hidden_channels))
+
+        # additional convolution layers with increasing number of channels
+        for _ in range(num_layers - 1):
+            next_hidden_channels = hidden_channels + step_size
+            self.conv_layers.append(nn.Conv2d(hidden_channels, next_hidden_channels, kernel_size=3, stride=1, padding=1))
+            self.bn_layers.append(nn.BatchNorm2d(next_hidden_channels))
+            hidden_channels = next_hidden_channels
+
+        self.dropout = nn.Dropout(dropout_rate)
+
+        #(28x28 for FashionMNIST)
+        self.flattened_size = hidden_channels * 4 * 4  
+        self.fc1 = nn.Linear(self.flattened_size, 128)
         self.fc2 = nn.Linear(128, n_classes)
         
     def forward(self, x):
@@ -84,12 +112,13 @@ class CNN(nn.Module):
             preds (tensor): logits of predictions of shape (N, C)
                 Reminder: logits are value pre-softmax.
         """
-        preds = F.max_pool2d(F.relu(self.conv1(preds)), 2)
-        preds = F.max_pool2d(F.relu(self.conv2(preds)), 2)
-        preds = F.max_pool2d(F.relu(self.conv3(preds)), 2)
-        preds = preds.view(-1, 64*4*4)
-        preds = F.relu(self.fc1(preds))
-        preds = self.fc2(preds)
+        for i in range(self.num_layers):
+            x = F.relu(self.bn_layers[i](self.conv_layers[i](x)))
+            x = F.max_pool2d(x, 2)
+
+        x = x.view(x.size(0), -1)  
+        x = self.dropout(F.relu(self.fc1(x)))  
+        preds = self.fc2(x)
         return preds
         
 class MyMSA(nn.Module) :
@@ -369,3 +398,4 @@ class Trainer(object):
 
         # We return the labels after transforming them into numpy array.
         return pred_labels.cpu().numpy()
+        
