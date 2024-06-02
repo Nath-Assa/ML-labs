@@ -85,10 +85,11 @@ def main(args):
     else:
         raise ValueError("Invalid nn_type")
 
+    model.to(args.device)
     summary(model)
 
     # Trainer object
-    method_obj = Trainer(model, lr=args.lr, epochs=args.max_iters, batch_size=args.nn_batch_size)
+    method_obj = Trainer(model, lr=args.lr, epochs=args.max_iters, batch_size=args.nn_batch_size, device=args.device)
 
 
     ## 4. Train and evaluate the method
