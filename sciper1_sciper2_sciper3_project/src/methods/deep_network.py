@@ -67,14 +67,10 @@ class CNN(nn.Module):
         """
         Initialize the network.
         
-        You can add arguments if you want, but WITH a default value, e.g.:
-            __init__(self, input_channels, n_classes, my_arg=32)
-        
         Arguments:
             input_channels (int): number of channels in the input
             n_classes (int): number of classes to predict
         """
-        super().__init__()
         super(CNN, self).__init__()
 
         self.num_layers = num_layers
@@ -97,10 +93,8 @@ class CNN(nn.Module):
             hidden_channels = next_hidden_channels
 
         self.dropout = nn.Dropout(dropout_rate)
-
-        #(28x28 for FashionMNIST)
-        self.flattened_size = hidden_channels * 4 * 4  
-        self.fc1 = nn.Linear(self.flattened_size, 128)
+        self.flattened_size = None
+        self.fc1 = nn.Linear(1024, 128)  # Placeholder, will update in forward pass
         self.fc2 = nn.Linear(128, n_classes)
         
     def forward(self, x):
@@ -117,10 +111,15 @@ class CNN(nn.Module):
             x = F.relu(self.bn_layers[i](self.conv_layers[i](x)))
             x = F.max_pool2d(x, 2)
 
-        x = x.view(x.size(0), -1)  
+        x = x.view(x.size(0), -1)  # Flatten
+        if self.flattened_size is None:
+            self.flattened_size = x.size(1)
+            self.fc1 = nn.Linear(self.flattened_size, 128)
+        
         x = self.dropout(F.relu(self.fc1(x)))  
         preds = self.fc2(x)
         return preds
+
         
 class MyMSA(nn.Module) :
     def __init__(self,D,nb_heads) :
@@ -178,19 +177,19 @@ class MyViT(nn.Module):
     """
     A Transformer-based neural network
     """
-    def __init__(self, chw, n_patches, n_blocks, hidden_d, n_heads, out_d):
+    def __init__(self, chw, n_patches, n_blocks, hidden_d, n_heads, out_d, mlp_ratio=4):
         """
         Initialize the network.
-        
         """
-        super(MyViT,self).__init__()
+        super(MyViT, self).__init__()
 
-        #Defining attributes
+        # Defining attributes
         self.chw = chw # (C, H, W)
         self.nb_patches = n_patches
         self.nb_blocks = n_blocks
         self.hidden_d = hidden_d
         self.nb_heads = n_heads
+        self.mlp_ratio = mlp_ratio
         
         # Patches sizes
         assert chw[1] % self.nb_patches == 0 
@@ -199,7 +198,7 @@ class MyViT(nn.Module):
 
         # 1. Linear mapper 
         self.input_d = chw[0] * self.patch_size[0] * self.patch_size[1]
-        self.linear_mapper = nn.Linear(self.input_d,self.hidden_d)
+        self.linear_mapper = nn.Linear(self.input_d, self.hidden_d)
 
         # 2. Learnable classification token 
         self.class_token = nn.Parameter(torch.rand(1, self.hidden_d))
@@ -208,7 +207,7 @@ class MyViT(nn.Module):
         self.positional_embeddings = self.create_positional_embeddings(self.nb_patches ** 2 + 1, hidden_d)
         
         # 4. Transformer encoder blocks 
-        self.blocks = nn.ModuleList([MyViTBlock(hidden_d, self.nb_heads) for _ in range(self.nb_blocks)])
+        self.blocks = nn.ModuleList([MyViTBlock(hidden_d, self.nb_heads, self.mlp_ratio) for _ in range(self.nb_blocks)])
         
         # 5. Classification MLP 
         self.mlp = nn.Sequential(nn.Linear(self.hidden_d, out_d), nn.Softmax(dim=1))
@@ -222,10 +221,10 @@ class MyViT(nn.Module):
 
         patches = torch.zeros(n, nb_patches**2, c * patch_size * patch_size)
     
-        for index, image in enumerate(x) :
+        for index, image in enumerate(x):
             for i in range(nb_patches):
-                for j in range(nb_patches) :
-                    patch = image [:, i * patch_size : (i + 1) * patch_size, j * patch_size :(j + 1) * patch_size]
+                for j in range(nb_patches):
+                    patch = image[:, i * patch_size : (i + 1) * patch_size, j * patch_size : (j + 1) * patch_size]
                     patches[index, i * nb_patches + j] = patch.flatten() 
 
         return patches
@@ -237,7 +236,6 @@ class MyViT(nn.Module):
                 result[i][j] = np.sin(i / (10000 ** (j / D))) if j % 2 == 0 else np.cos(i / (10000 ** ((j - 1) / D)))
         return result
      
-
     def forward(self, x):
         """
         Predict the class of a batch of samples with the model.
@@ -264,11 +262,11 @@ class MyViT(nn.Module):
         preds = tokens + self.positional_embeddings
 
         # Transformer blocks 
-        for block in self.blocks : 
+        for block in self.blocks: 
             preds = block(preds)
 
         # Get classification token 
-        preds = preds[:,0]
+        preds = preds[:, 0]
         
         # Map to the output distribution 
         preds = self.mlp(preds)
@@ -282,7 +280,7 @@ class Trainer(object):
     It will also serve as an interface between numpy and pytorch.
     """
 
-    def __init__(self, model, lr, epochs, batch_size):
+    def __init__(self, model, lr, epochs, batch_size, device = "cpu"):
         """
         Initialize the trainer object for a given model.
 
@@ -292,6 +290,7 @@ class Trainer(object):
             epochs (int): number of epochs of training
             batch_size (int): number of data points in each batch
         """
+        self.device = device
         self.lr = lr
         self.epochs = epochs
         self.model = model
@@ -311,7 +310,7 @@ class Trainer(object):
             dataloader (DataLoader): dataloader for training data
         """
         for ep in range(self.epochs):
-            self.train_one_epoch(dataloader)
+            self.train_one_epoch(dataloader, ep)
 
             ### WRITE YOUR CODE HERE if you want to do add something else at each epoch
 
@@ -327,6 +326,8 @@ class Trainer(object):
         """
         self.model.train()
         for batch_data, batch_labels in dataloader:
+            batch_labels = batch_labels.long() 
+            batch_data, batch_labels = batch_data.to(self.device), batch_labels.to(self.device)
             self.optimizer.zero_grad()
             out = self.model(batch_data)
             loss = self.criterion(out, batch_labels)
@@ -354,7 +355,8 @@ class Trainer(object):
         all_preds = []
         with torch.no_grad():
             for batch_data in dataloader:
-                outputs = self.model(batch_data[0])
+                batch_data = batch_data[0].to(self.device)
+                outputs = self.model(batch_data)
                 _, predicted = torch.max(outputs.data, 1)
                 all_preds.append(predicted)
         
