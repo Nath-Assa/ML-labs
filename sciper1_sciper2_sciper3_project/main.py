@@ -32,6 +32,16 @@ def main(args):
 
     ## 2. Then we must prepare it. This is were you can create a validation set,
     #  normalize, add bias, etc.
+    
+    if args.nn_type in ["transformer", "cnn"]:
+        image_size = int(np.sqrt(xtrain.shape[1]))
+        xtrain = xtrain.reshape(xtrain.shape[0], 1, image_size, image_size)
+        xtest = xtest.reshape(xtest.shape[0], 1, image_size, image_size)
+    else:
+        xtrain = xtrain.reshape(xtrain.shape[0], -1)
+        xtest = xtest.reshape(xtest.shape[0], -1)
+        
+        
     means = np.mean(xtrain, axis=0)
     stds = np.std(xtrain, axis=0)
     
@@ -75,6 +85,7 @@ def main(args):
     else:
         raise ValueError("Invalid nn_type")
 
+    model.to(args.device)
     summary(model)
 
     # Trainer object
