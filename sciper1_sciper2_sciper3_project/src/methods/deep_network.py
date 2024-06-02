@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 
 ## MS2
@@ -141,7 +142,7 @@ class MyMSA(nn.Module) :
         results = []
         for element in elements : 
             seq = [] 
-            for head in (self.nb_heads) :
+            for head in range(self.nb_heads) :
                 q_mapping = self.q_mappings[head]
                 k_mapping = self.k_mappings[head]
                 v_mapping = self.v_mappings[head]
@@ -153,7 +154,7 @@ class MyMSA(nn.Module) :
                 seq.append(attention @ v )
 
             results.append(torch.hstack(seq))
-        return torch.cat([torch.unsqueeze(r,dim = 0) for r in results])
+        return torch.stack(results) # before: torch.cat([torch.unsqueeze(r,dim = 0) for r in results])
 
 class MyViTBlock(nn.Module) :
     def __init__(self,hidden_d,nb_heads,mlp_ratio) :
@@ -194,33 +195,32 @@ class MyViT(nn.Module):
         # Patches sizes
         assert chw[1] % self.nb_patches == 0 
         assert chw[2] % self.nb_patches == 0 
-        self.patch_size = (chw[1] / self.nb_patches, chw[2] / self.nb_patches )  # We've made the assumption that we have a square picture
+        self.patch_size = (chw[1] // self.nb_patches, chw[2] // self.nb_patches )  # We've made the assumption that we have a square picture
 
         # 1. Linear mapper 
-        self.input_d = int(chw[0]* self.nb_patches[0] * self.nb_patches[1])
+        self.input_d = chw[0] * self.patch_size[0] * self.patch_size[1]
         self.linear_mapper = nn.Linear(self.input_d,self.hidden_d)
 
         # 2. Learnable classification token 
-        self.class_tokens = nn.Parameter(torch.rand(1,self.hidden_d))
-
+        self.class_token = nn.Parameter(torch.rand(1, self.hidden_d))
+        
         # 3. Positional embedding 
-        self.positional_embeddings = self.positional_embeddings(self.nb_patches ** 2 + 1, hidden_d)
+        self.positional_embeddings = self.create_positional_embeddings(self.nb_patches ** 2 + 1, hidden_d)
         
         # 4. Transformer encoder blocks 
         self.blocks = nn.ModuleList([MyViTBlock(hidden_d, self.nb_heads) for _ in range(self.nb_blocks)])
         
         # 5. Classification MLP 
-        self.mlp = nn.Sequantial(nn.Linear(self.hidden_d,out_d),nn.Softmax(dim = 1))
+        self.mlp = nn.Sequential(nn.Linear(self.hidden_d, out_d), nn.Softmax(dim=1))
 
-    def patchify(self,x):
+    def patchify(self, x):
         n, c, h, w = x.shape
 
         assert h == w
         nb_patches = self.nb_patches
         patch_size = h // nb_patches
 
-        # Patches have the form ( N, total nb of patches, h*w of patch )
-        patches = torch.zeros(n,nb_patches**2,h*w*c // nb_patches ** 2)
+        patches = torch.zeros(n, nb_patches**2, c * patch_size * patch_size)
     
         for index, image in enumerate(x) :
             for i in range(nb_patches):
@@ -230,14 +230,12 @@ class MyViT(nn.Module):
 
         return patches
     
-    def positional_embeddings(self,length) :
-        D = self.hidden_d
+    def create_positional_embeddings(self, length, D):
         result = torch.ones(length, D)
         for i in range(length):
             for j in range(D):
                 result[i][j] = np.sin(i / (10000 ** (j / D))) if j % 2 == 0 else np.cos(i / (10000 ** ((j - 1) / D)))
-       
-        return result   
+        return result
      
 
     def forward(self, x):
@@ -254,16 +252,16 @@ class MyViT(nn.Module):
         N, C, H, W = x.shape
 
         # Divide image into patches 
-        patches = self.patchify(x,self.nb_patches)
+        patches = self.patchify(x)
 
         # Map the vector corresponding to each patch to the hidden size dimension 
         tokens = self.linear_mapper(patches)
 
         # Add classification tokens 
-        tokens = torch.cat((self.class_tokens.expand(N,1,-1)),dim=1)
+        tokens = torch.cat((self.class_token.expand(N, 1, -1), tokens), dim=1)
 
         # Adding positional embedding 
-        preds = tokens + self.positional_embeddings(N,1,1)
+        preds = tokens + self.positional_embeddings
 
         # Transformer blocks 
         for block in self.blocks : 
