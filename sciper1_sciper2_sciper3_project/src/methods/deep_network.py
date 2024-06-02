@@ -14,7 +14,7 @@ class MLP(nn.Module):
     It should not use any convolutional layers.
     """
 
-    def __init__(self, input_size, n_classes, hidden_size=128, dropout_rate=0.5, num_layers=3):
+    def __init__(self, input_size, n_classes, hidden_size=128, dropout_rate=0.1, num_layers=3):
         """
         Initialize the network.
         
@@ -280,7 +280,7 @@ class Trainer(object):
     It will also serve as an interface between numpy and pytorch.
     """
 
-    def __init__(self, model, lr, epochs, batch_size, device = "cpu"):
+    def __init__(self, model, lr, epochs, batch_size):
         """
         Initialize the trainer object for a given model.
 
@@ -290,7 +290,6 @@ class Trainer(object):
             epochs (int): number of epochs of training
             batch_size (int): number of data points in each batch
         """
-        self.device = device
         self.lr = lr
         self.epochs = epochs
         self.model = model
@@ -327,7 +326,6 @@ class Trainer(object):
         self.model.train()
         for batch_data, batch_labels in dataloader:
             batch_labels = batch_labels.long() 
-            batch_data, batch_labels = batch_data.to(self.device), batch_labels.to(self.device)
             self.optimizer.zero_grad()
             out = self.model(batch_data)
             loss = self.criterion(out, batch_labels)
@@ -355,7 +353,6 @@ class Trainer(object):
         all_preds = []
         with torch.no_grad():
             for batch_data in dataloader:
-                batch_data = batch_data[0].to(self.device)
                 outputs = self.model(batch_data)
                 _, predicted = torch.max(outputs.data, 1)
                 all_preds.append(predicted)
