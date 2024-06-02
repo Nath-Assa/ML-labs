@@ -105,8 +105,8 @@ def main(args):
     # Predict on unseen data
     if  args.test:
         preds = method_obj.predict(xtest)
-        np.savetxt("test_predictions.csv", preds, delimiter=",")
-        print("Test set predictions saved to 'test_predictions.csv'. Submit this file to AIcrowd for evaluation.")
+        np.save("predictions", preds)
+        print("Test set predictions saved. Submit this file to AIcrowd for evaluation.")
     else:
         preds = method_obj.predict(xval)
         y_true = yval
